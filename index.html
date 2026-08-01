@@ -1,0 +1,2715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Database Explorer & Visual Query Builder</title>
+    <style>
+        :root {
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e8ecf1;
+            --text-primary: #2d3748;
+            --text-secondary: #4a5568;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --accent-primary: #3182ce;
+            --accent-hover: #2c5282;
+            --accent-light: #ebf8ff;
+            --success: #38a169;
+            --warning: #d69e2e;
+            --danger: #e53e3e;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --transition: all 0.2s ease;
+            --toolbar-height: 48px;
+            --statusbar-height: 28px;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a202c;
+            --bg-secondary: #2d3748;
+            --bg-tertiary: #4a5568;
+            --text-primary: #f7fafc;
+            --text-secondary: #e2e8f0;
+            --text-muted: #a0aec0;
+            --border-color: #4a5568;
+            --accent-primary: #63b3ed;
+            --accent-hover: #4299e1;
+            --accent-light: #2c5282;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            height: var(--toolbar-height);
+        }
+
+        .toolbar-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 13px;
+        }
+
+        .toolbar-btn:hover:not(:disabled) {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+        }
+
+        .toolbar-btn.primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+
+        .toolbar-btn.primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        .toolbar-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 24px;
+            background: var(--border-color);
+            margin: 0 4px;
+        }
+
+        /* Connection Panel */
+        .connection-panel {
+            display: none;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .connection-panel.active {
+            display: flex;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .form-control {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-indicator.connected {
+            background: var(--success);
+        }
+
+        .status-indicator.disconnected {
+            background: var(--danger);
+        }
+
+        /* Main Content Layout */
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 1fr 200px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .resizable-container {
+            position: relative;
+            display: flex;
+            height: 100%;
+        }
+
+        .resize-handle-vertical {
+            width: 6px;
+            cursor: col-resize;
+            background: var(--border-color);
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .resize-handle-vertical:hover,
+        .resize-handle-vertical.resizing {
+            background: var(--accent-primary);
+        }
+
+        .resize-handle-horizontal {
+            height: 6px;
+            cursor: row-resize;
+            background: var(--border-color);
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .resize-handle-horizontal:hover,
+        .resize-handle-horizontal.resizing {
+            background: var(--accent-primary);
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-width: 150px;
+            min-height: 100px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow: auto;
+            padding: 8px;
+        }
+
+        /* Database Explorer Panel */
+        .db-explorer-panel {
+            grid-row: 1 / 2;
+            grid-column: 1 / 2;
+            border-right: none;
+            position: relative;
+        }
+
+        /* Column Panels Grid */
+        .column-panel {
+            grid-row: 1 / 2;
+            grid-column: 2 / 3;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .column-panels-row {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .columns-explorer {
+            flex: 1;
+            border-right: none;
+            border-bottom: none;
+            position: relative;
+            min-width: 150px;
+        }
+
+        .selected-columns {
+            flex: 1;
+            border-bottom: none;
+            position: relative;
+            min-width: 150px;
+        }
+
+        .filter-builder {
+            flex: 0 0 auto;
+            height: 200px;
+            border-top: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        /* Tree View */
+        .tree-view {
+            list-style: none;
+        }
+
+        .tree-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .tree-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .tree-item.selected {
+            background: var(--accent-light);
+            color: var(--accent-primary);
+        }
+
+        .tree-item-icon {
+            font-size: 14px;
+            width: 16px;
+            text-align: center;
+        }
+
+        .tree-children {
+            list-style: none;
+            margin-left: 20px;
+            display: none;
+        }
+
+        .tree-children.expanded {
+            display: block;
+        }
+
+        .tree-toggle {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .data-table th:hover {
+            background: var(--border-color);
+        }
+
+        .data-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        /* Filter Conditions */
+        .filter-condition {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-condition select,
+        .filter-condition input {
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .filter-condition .btn-remove {
+            padding: 4px 8px;
+            background: var(--danger);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-add-filter {
+            padding: 8px 12px;
+            background: var(--accent-primary);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        /* SQL Panel */
+        .sql-panel {
+            grid-row: 2 / 3;
+            grid-column: 1 / 3;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sql-editor-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .sql-editor {
+            width: 100%;
+            height: 100%;
+            padding: 12px;
+            border: none;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            resize: none;
+            line-height: 1.6;
+        }
+
+        .sql-editor:focus {
+            outline: none;
+        }
+
+        .sql-actions {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Results Panel */
+        .results-panel {
+            grid-row: 2 / 3;
+            grid-column: 1 / 3;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .results-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .results-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .results-grid-container {
+            flex: 1;
+            overflow: auto;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 16px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-muted);
+            height: var(--statusbar-height);
+        }
+
+        .status-bar-items {
+            display: flex;
+            gap: 24px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 5px;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* Context Menu */
+        .context-menu {
+            position: absolute;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 4px 0;
+            min-width: 150px;
+            display: none;
+            z-index: 100;
+        }
+
+        .context-menu.active {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .context-menu-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background: var(--border-color);
+            margin: 4px 0;
+        }
+
+        /* Search Box */
+        .search-box {
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 12px 8px 32px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .tab:hover {
+            background: var(--bg-secondary);
+        }
+
+        .tab.active {
+            border-bottom-color: var(--accent-primary);
+            background: var(--bg-secondary);
+            color: var(--accent-primary);
+        }
+
+        /* Group Pill */
+        .group-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--accent-primary);
+            color: #fff;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .group-pill .remove {
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        .group-pill .remove:hover {
+            opacity: 1;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination span {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Join Visualizer */
+        .join-visualizer {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .join-table {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+        }
+
+        .join-type-selector {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        /* Warning Banner */
+        .warning-banner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #fefcbf;
+            border-bottom: 1px solid #f6e05e;
+            color: #975a16;
+            font-size: 13px;
+        }
+
+        [data-theme="dark"] .warning-banner {
+            background: #744210;
+            border-bottom-color: #975a16;
+            color: #fefcbf;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: calc(var(--statusbar-height) + 20px);
+            right: 20px;
+            z-index: 1001;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            margin-top: 8px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast.warning {
+            border-left: 4px solid var(--warning);
+        }
+
+        .toast.info {
+            border-left: 4px solid var(--accent-primary);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Settings Grid */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--border-color);
+            border-radius: 26px;
+            transition: var(--transition);
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-primary);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Query List */
+        .query-list {
+            list-style: none;
+        }
+
+        .query-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .query-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .query-item-name {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .query-item-date {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .query-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .query-item-actions button {
+            padding: 4px 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .query-item-actions button:hover {
+            background: var(--bg-tertiary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .column-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar {
+                justify-content: center;
+            }
+        }
+
+        /* Selected Column Item */
+        .selected-column-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .selected-column-item .actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .selected-column-item .actions button {
+            padding: 2px 6px;
+            font-size: 11px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+
+        .selected-column-item .actions button:hover {
+            background: var(--accent-primary);
+            color: #fff;
+        }
+
+        /* Aggregate Buttons */
+        .aggregate-buttons {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .agg-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+
+        .agg-btn:hover,
+        .agg-btn.active {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+
+        /* Group By Area */
+        .group-by-area {
+            min-height: 40px;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .group-by-placeholder {
+            color: var(--text-muted);
+            font-size: 12px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button class="toolbar-btn primary" id="btnConnect">🔌 Connect</button>
+        <button class="toolbar-btn" id="btnDisconnect" disabled>🔓 Disconnect</button>
+        <button class="toolbar-btn" id="btnTestConnection" disabled>🧪 Test</button>
+        <div class="toolbar-separator"></div>
+        <button class="toolbar-btn" id="btnRefresh" disabled>🔄 Refresh</button>
+        <button class="toolbar-btn primary" id="btnExecute" disabled>▶️ Execute</button>
+        <button class="toolbar-btn" id="btnClear">🗑️ Clear</button>
+        <div class="toolbar-separator"></div>
+        <button class="toolbar-btn" id="btnSaveQuery" disabled>💾 Save</button>
+        <button class="toolbar-btn" id="btnLoadQuery" disabled>📂 Load</button>
+        <button class="toolbar-btn" id="btnExport" disabled>📤 Export</button>
+        <div class="toolbar-separator"></div>
+        <button class="toolbar-btn" id="btnSettings">⚙️ Settings</button>
+        <button class="toolbar-btn" id="btnDarkMode">🌙 Dark</button>
+    </div>
+
+    <!-- Connection Panel -->
+    <div class="connection-panel" id="connectionPanel">
+        <div class="form-group">
+            <label for="dbType">Database Type</label>
+            <select id="dbType" class="form-control">
+                <option value="mock">Mock Database</option>
+                <option value="mysql">MySQL</option>
+                <option value="postgresql">PostgreSQL</option>
+                <option value="sqlite">SQLite</option>
+                <option value="mssql">SQL Server</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="server">Server</label>
+            <input type="text" id="server" class="form-control" value="localhost">
+        </div>
+        <div class="form-group">
+            <label for="port">Port</label>
+            <input type="number" id="port" class="form-control" value="3306">
+        </div>
+        <div class="form-group">
+            <label for="database">Database</label>
+            <input type="text" id="database" class="form-control" value="testdb">
+        </div>
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" class="form-control" value="admin">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" class="form-control" value="password">
+        </div>
+        <div class="form-group">
+            <label for="timeout">Timeout (s)</label>
+            <input type="number" id="timeout" class="form-control" value="30">
+        </div>
+        <div class="connection-status">
+            <span class="status-indicator disconnected" id="statusIndicator"></span>
+            <span id="statusText">Disconnected</span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Database Explorer Panel -->
+        <div class="panel db-explorer-panel" id="dbExplorerPanel">
+            <div class="panel-header">
+                <span>📁 Database Objects</span>
+                <button class="btn" id="btnExpandAll" style="padding: 4px 8px; font-size: 11px;">Expand All</button>
+            </div>
+            <div class="panel-body">
+                <div class="search-box">
+                    <input type="text" id="searchObjects" placeholder="Search objects...">
+                </div>
+                <ul class="tree-view" id="objectsTree"></ul>
+            </div>
+            <div class="resize-handle-vertical" id="resizeHandleDB"></div>
+        </div>
+
+        <!-- Column Panels -->
+        <div class="panel column-panel">
+            <div class="column-panels-row">
+                <!-- Columns Explorer -->
+                <div class="panel columns-explorer" id="columnsExplorerPanel">
+                    <div class="panel-header">
+                        <span>📋 Columns</span>
+                        <span class="badge" id="columnCount">0</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="search-box">
+                            <input type="text" id="searchColumns" placeholder="Search columns...">
+                        </div>
+                        <div class="panel-header" style="background:none; padding:4px 0; border:none;">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                                <input type="checkbox" id="selectAllColumns"> Select All
+                            </label>
+                        </div>
+                        <div id="columnsList"></div>
+                    </div>
+                </div>
+                
+                <!-- Resize Handle -->
+                <div class="resize-handle-vertical" id="resizeHandleColumns"></div>
+
+                <!-- Selected Columns -->
+                <div class="panel selected-columns" id="selectedColumnsPanel">
+                    <div class="panel-header">
+                        <span>✅ Selected Columns</span>
+                        <span class="badge" id="selectedCount">0</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="aggregate-buttons">
+                            <button class="agg-btn" data-agg="COUNT">COUNT</button>
+                            <button class="agg-btn" data-agg="SUM">SUM</button>
+                            <button class="agg-btn" data-agg="AVG">AVG</button>
+                            <button class="agg-btn" data-agg="MIN">MIN</button>
+                            <button class="agg-btn" data-agg="MAX">MAX</button>
+                            <button class="agg-btn" data-agg="DISTINCT">DISTINCT</button>
+                        </div>
+                        <div id="selectedColumnsList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Builder -->
+            <div class="panel filter-builder">
+                <div class="panel-header">
+                    <span>🔍 Filter Builder</span>
+                    <button class="btn-add-filter" id="addFilterBtn">+ Add Filter</button>
+                </div>
+                <div class="panel-body">
+                    <div id="filtersContainer"></div>
+                    
+                    <div style="margin-top: 12px;">
+                        <div class="panel-header" style="margin-bottom: 8px; background: none; padding-left: 0;">
+                            <span>📊 Group By</span>
+                        </div>
+                        <div class="group-by-area" id="groupByArea">
+                            <span class="group-by-placeholder">Drag columns here to group</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SQL Panel -->
+        <div class="panel sql-panel">
+            <div class="panel-header">
+                <span>📝 Generated SQL</span>
+                <div class="sql-actions" style="border: none; padding: 0;">
+                    <button class="btn" id="btnCopySql" style="padding: 4px 8px; font-size: 11px;">📋 Copy</button>
+                    <button class="btn" id="btnFormatSql" style="padding: 4px 8px; font-size: 11px;">✨ Format</button>
+                </div>
+            </div>
+            <div class="sql-editor-container">
+                <textarea class="sql-editor" id="sqlEditor" spellcheck="false" readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="panel results-panel" id="resultsPanel">
+        <div class="results-toolbar">
+            <span class="results-info" id="resultsInfo">No results</span>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn" id="btnCopyResults" style="padding: 4px 8px; font-size: 11px;">📋 Copy</button>
+                <button class="btn" id="btnExportResults" style="padding: 4px 8px; font-size: 11px;">📤 CSV</button>
+            </div>
+        </div>
+        <div class="results-grid-container">
+            <table class="data-table" id="resultsTable">
+                <thead>
+                    <tr id="resultsHeader"></tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
+        <div class="pagination" id="pagination">
+            <button id="btnFirstPage" disabled>⏮</button>
+            <button id="btnPrevPage" disabled>◀</button>
+            <span id="pageInfo">Page 0 of 0</span>
+            <button id="btnNextPage" disabled>▶</button>
+            <button id="btnLastPage" disabled>⏭</button>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-bar-items">
+            <span class="status-item">
+                <span id="statusConnection">🔴 Disconnected</span>
+            </span>
+            <span class="status-item">
+                <span id="statusProvider">Provider: None</span>
+            </span>
+        </div>
+        <div class="status-bar-items">
+            <span class="status-item">
+                <span id="statusRows">Rows: 0</span>
+            </span>
+            <span class="status-item">
+                <span id="statusTime">Time: 0ms</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">⚙️ Settings</span>
+                <button class="modal-close" id="closeSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <span>Dark Mode</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="darkModeToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <span>Compact Mode</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="compactModeToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item" style="grid-column: 1 / -1;">
+                        <span>Font Size: <span id="fontSizeValue">14</span>px</span>
+                        <input type="range" id="fontSizeSlider" min="10" max="20" value="14" style="flex: 1; margin-left: 12px;">
+                    </div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <h4 style="margin-bottom: 12px;">Saved Queries</h4>
+                    <ul class="query-list" id="savedQueriesList"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="resetLayout">Reset Layout</button>
+                <button class="btn btn-primary" id="saveSettings">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ============================================
+        // Database Provider Interface
+        // ============================================
+        class DatabaseProvider {
+            async connect() { throw new Error('Not implemented'); }
+            async disconnect() { throw new Error('Not implemented'); }
+            async test() { throw new Error('Not implemented'); }
+            async getSchemas() { return []; }
+            async getTables(schema = null) { return []; }
+            async getViews(schema = null) { return []; }
+            async getColumns(table, schema = null) { return []; }
+            async executeQuery(sql) { return { columns: [], rows: [] }; }
+        }
+
+        // ============================================
+        // Mock Database Provider Implementation
+        // ============================================
+        class MockDatabaseProvider extends DatabaseProvider {
+            constructor() {
+                super();
+                this.connected = false;
+                this.metadata = {
+                    schemas: ['public', 'sales', 'inventory'],
+                    tables: {
+                        'public': [
+                            { name: 'users', type: 'table' },
+                            { name: 'products', type: 'table' },
+                            { name: 'categories', type: 'table' }
+                        ],
+                        'sales': [
+                            { name: 'orders', type: 'table' },
+                            { name: 'order_items', type: 'table' },
+                            { name: 'customers', type: 'table' }
+                        ],
+                        'inventory': [
+                            { name: 'stock', type: 'table' },
+                            { name: 'warehouses', type: 'table' }
+                        ]
+                    },
+                    columns: {
+                        'users': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'username', type: 'VARCHAR(50)', nullable: false, pk: false, fk: false },
+                            { name: 'email', type: 'VARCHAR(255)', nullable: true, pk: false, fk: false },
+                            { name: 'created_at', type: 'DATETIME', nullable: true, pk: false, fk: false },
+                            { name: 'updated_at', type: 'DATETIME', nullable: true, pk: false, fk: false }
+                        ],
+                        'products': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'name', type: 'VARCHAR(200)', nullable: false, pk: false, fk: false },
+                            { name: 'description', type: 'TEXT', nullable: true, pk: false, fk: false },
+                            { name: 'price', type: 'DECIMAL(10,2)', nullable: false, pk: false, fk: false },
+                            { name: 'category_id', type: 'INT', nullable: true, pk: false, fk: true },
+                            { name: 'stock_quantity', type: 'INT', nullable: true, pk: false, fk: false }
+                        ],
+                        'categories': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'name', type: 'VARCHAR(100)', nullable: false, pk: false, fk: false },
+                            { name: 'parent_id', type: 'INT', nullable: true, pk: false, fk: true }
+                        ],
+                        'orders': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'user_id', type: 'INT', nullable: false, pk: false, fk: true },
+                            { name: 'order_date', type: 'DATETIME', nullable: false, pk: false, fk: false },
+                            { name: 'total_amount', type: 'DECIMAL(10,2)', nullable: true, pk: false, fk: false },
+                            { name: 'status', type: 'VARCHAR(20)', nullable: false, pk: false, fk: false }
+                        ],
+                        'order_items': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'order_id', type: 'INT', nullable: false, pk: false, fk: true },
+                            { name: 'product_id', type: 'INT', nullable: false, pk: false, fk: true },
+                            { name: 'quantity', type: 'INT', nullable: false, pk: false, fk: false },
+                            { name: 'unit_price', type: 'DECIMAL(10,2)', nullable: false, pk: false, fk: false }
+                        ],
+                        'customers': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'company_name', type: 'VARCHAR(200)', nullable: false, pk: false, fk: false },
+                            { name: 'contact_name', type: 'VARCHAR(100)', nullable: true, pk: false, fk: false },
+                            { name: 'email', type: 'VARCHAR(255)', nullable: true, pk: false, fk: false },
+                            { name: 'phone', type: 'VARCHAR(20)', nullable: true, pk: false, fk: false }
+                        ],
+                        'stock': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'product_id', type: 'INT', nullable: false, pk: false, fk: true },
+                            { name: 'warehouse_id', type: 'INT', nullable: false, pk: false, fk: true },
+                            { name: 'quantity', type: 'INT', nullable: false, pk: false, fk: false }
+                        ],
+                        'warehouses': [
+                            { name: 'id', type: 'INT', nullable: false, pk: true, fk: false },
+                            { name: 'name', type: 'VARCHAR(100)', nullable: false, pk: false, fk: false },
+                            { name: 'location', type: 'VARCHAR(255)', nullable: true, pk: false, fk: false }
+                        ]
+                    }
+                };
+                
+                // Sample data for mock queries
+                this.sampleData = {
+                    'users': [
+                        [1, 'john_doe', 'john@example.com', '2023-01-15 10:30:00', '2023-06-20 14:45:00'],
+                        [2, 'jane_smith', 'jane@example.com', '2023-02-20 09:15:00', '2023-07-10 11:20:00'],
+                        [3, 'bob_wilson', 'bob@example.com', '2023-03-10 16:45:00', '2023-08-05 08:30:00'],
+                        [4, 'alice_brown', 'alice@example.com', '2023-04-05 13:00:00', '2023-09-15 17:10:00'],
+                        [5, 'charlie_davis', 'charlie@example.com', '2023-05-12 11:30:00', '2023-10-01 09:45:00']
+                    ],
+                    'products': [
+                        [1, 'Laptop Pro', 'High-performance laptop', 1299.99, 1, 50],
+                        [2, 'Wireless Mouse', 'Ergonomic wireless mouse', 49.99, 1, 200],
+                        [3, 'Mechanical Keyboard', 'RGB mechanical keyboard', 149.99, 1, 150],
+                        [4, 'Monitor 27"', '4K UHD monitor', 399.99, 1, 75],
+                        [5, 'USB-C Hub', '7-in-1 USB-C hub', 79.99, 1, 300]
+                    ],
+                    'categories': [
+                        [1, 'Electronics', null],
+                        [2, 'Computers', 1],
+                        [3, 'Accessories', 1],
+                        [4, 'Office Supplies', null],
+                        [5, 'Furniture', 4]
+                    ],
+                    'orders': [
+                        [1, 1, '2023-06-01 10:00:00', 1349.98, 'completed'],
+                        [2, 2, '2023-06-05 14:30:00', 199.98, 'completed'],
+                        [3, 1, '2023-06-10 09:15:00', 399.99, 'shipped'],
+                        [4, 3, '2023-06-15 16:45:00', 79.99, 'processing'],
+                        [5, 4, '2023-06-20 11:00:00', 1699.97, 'pending']
+                    ],
+                    'order_items': [
+                        [1, 1, 1, 1, 1299.99],
+                        [2, 1, 2, 1, 49.99],
+                        [3, 2, 3, 1, 149.99],
+                        [4, 2, 2, 1, 49.99],
+                        [5, 3, 4, 1, 399.99]
+                    ],
+                    'customers': [
+                        [1, 'Acme Corp', 'John Smith', 'john@acme.com', '+1-555-0101'],
+                        [2, 'TechStart Inc', 'Jane Doe', 'jane@techstart.com', '+1-555-0102'],
+                        [3, 'Global Solutions', 'Bob Johnson', 'bob@global.com', '+1-555-0103'],
+                        [4, 'Innovation Labs', 'Alice Williams', 'alice@innovation.com', '+1-555-0104'],
+                        [5, 'Digital Dynamics', 'Charlie Brown', 'charlie@digital.com', '+1-555-0105']
+                    ]
+                };
+            }
+
+            async connect() {
+                await this._delay(300);
+                this.connected = true;
+                return true;
+            }
+
+            async disconnect() {
+                await this._delay(200);
+                this.connected = false;
+                return true;
+            }
+
+            async test() {
+                await this._delay(500);
+                return true;
+            }
+
+            async getSchemas() {
+                await this._delay(100);
+                return this.metadata.schemas;
+            }
+
+            async getTables(schema = null) {
+                await this._delay(100);
+                if (schema) {
+                    return this.metadata.tables[schema] || [];
+                }
+                const allTables = [];
+                for (const [schemaName, tables] of Object.entries(this.metadata.tables)) {
+                    allTables.push(...tables.map(t => ({ ...t, schema: schemaName })));
+                }
+                return allTables;
+            }
+
+            async getViews(schema = null) {
+                await this._delay(100);
+                return [];
+            }
+
+            async getColumns(table, schema = null) {
+                await this._delay(100);
+                return this.metadata.columns[table] || [];
+            }
+
+            async executeQuery(sql) {
+                await this._delay(200 + Math.random() * 300);
+                
+                // Parse the SQL to determine which table to query
+                const sqlUpper = sql.toUpperCase();
+                let tableName = null;
+                
+                for (const table of Object.keys(this.metadata.columns)) {
+                    if (sqlUpper.includes(table.toUpperCase())) {
+                        tableName = table;
+                        break;
+                    }
+                }
+                
+                if (tableName && this.sampleData[tableName]) {
+                    const columns = this.metadata.columns[tableName].map(c => c.name);
+                    const data = this.sampleData[tableName];
+                    
+                    // Apply simple LIMIT if present
+                    const limitMatch = sql.match(/LIMIT\s+(\d+)/i);
+                    if (limitMatch) {
+                        const limit = parseInt(limitMatch[1]);
+                        return {
+                            columns: columns,
+                            rows: data.slice(0, limit)
+                        };
+                    }
+                    
+                    return {
+                        columns: columns,
+                        rows: data
+                    };
+                }
+                
+                // Default response
+                return {
+                    columns: ['id', 'name', 'value', 'created_at'],
+                    rows: [
+                        [1, 'Item 1', 'Value 1', '2023-01-01'],
+                        [2, 'Item 2', 'Value 2', '2023-01-02'],
+                        [3, 'Item 3', 'Value 3', '2023-01-03']
+                    ]
+                };
+            }
+
+            _delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // ============================================
+        // Storage Manager
+        // ============================================
+        class StorageManager {
+            static save(key, value) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                    return true;
+                } catch (e) {
+                    console.error('Storage save error:', e);
+                    return false;
+                }
+            }
+
+            static load(key, defaultValue = null) {
+                try {
+                    const item = localStorage.getItem(key);
+                    return item ? JSON.parse(item) : defaultValue;
+                } catch (e) {
+                    console.error('Storage load error:', e);
+                    return defaultValue;
+                }
+            }
+
+            static remove(key) {
+                try {
+                    localStorage.removeItem(key);
+                    return true;
+                } catch (e) {
+                    console.error('Storage remove error:', e);
+                    return false;
+                }
+            }
+        }
+
+        // ============================================
+        // Theme Manager
+        // ============================================
+        class ThemeManager {
+            constructor() {
+                this.darkMode = StorageManager.load('darkMode', false);
+                this.compactMode = StorageManager.load('compactMode', false);
+                this.fontSize = StorageManager.load('fontSize', 14);
+                this.applyTheme();
+            }
+
+            applyTheme() {
+                document.documentElement.setAttribute('data-theme', this.darkMode ? 'dark' : 'light');
+                document.body.style.fontSize = `${this.fontSize}px`;
+                
+                if (this.compactMode) {
+                    document.body.classList.add('compact-mode');
+                } else {
+                    document.body.classList.remove('compact-mode');
+                }
+            }
+
+            toggleDarkMode() {
+                this.darkMode = !this.darkMode;
+                StorageManager.save('darkMode', this.darkMode);
+                this.applyTheme();
+                return this.darkMode;
+            }
+
+            toggleCompactMode() {
+                this.compactMode = !this.compactMode;
+                StorageManager.save('compactMode', this.compactMode);
+                this.applyTheme();
+                return this.compactMode;
+            }
+
+            setFontSize(size) {
+                this.fontSize = size;
+                StorageManager.save('fontSize', size);
+                this.applyTheme();
+            }
+        }
+
+        // ============================================
+        // Toast Notification Manager
+        // ============================================
+        class ToastManager {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+            }
+
+            show(message, type = 'info', duration = 3000) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `<span>${this._getIcon(type)}</span><span>${message}</span>`;
+                this.container.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.style.animation = 'slideIn 0.3s ease reverse';
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            }
+
+            _getIcon(type) {
+                const icons = {
+                    success: '✅',
+                    error: '❌',
+                    warning: '⚠️',
+                    info: 'ℹ️'
+                };
+                return icons[type] || icons.info;
+            }
+        }
+
+        // ============================================
+        // SQL Generator
+        // ============================================
+        class SQLGenerator {
+            constructor() {
+                this.selectedColumns = [];
+                this.filters = [];
+                this.groupByColumns = [];
+                this.joins = [];
+                this.orderBy = [];
+                this.limit = null;
+            }
+
+            setSelectedColumns(columns) {
+                this.selectedColumns = columns;
+            }
+
+            setFilters(filters) {
+                this.filters = filters;
+            }
+
+            setGroupBy(columns) {
+                this.groupByColumns = columns;
+            }
+
+            setJoins(joins) {
+                this.joins = joins;
+            }
+
+            setOrderBy(orderBy) {
+                this.orderBy = orderBy;
+            }
+
+            setLimit(limit) {
+                this.limit = limit;
+            }
+
+            generate() {
+                if (this.selectedColumns.length === 0) {
+                    return '-- Select at least one column to generate SQL';
+                }
+
+                let sql = 'SELECT ';
+                
+                // Build SELECT clause with aggregates
+                const selectParts = this.selectedColumns.map(col => {
+                    let colStr = col.table ? `\`${col.table}\`.\`${col.column}\`` : `\`${col.column}\``;
+                    if (col.aggregate) {
+                        colStr = `${col.aggregate}(${colStr})`;
+                    }
+                    if (col.alias && col.alias !== col.column) {
+                        colStr += ` AS \`${col.alias}\``;
+                    }
+                    return colStr;
+                });
+                
+                sql += selectParts.join(', ');
+                
+                // Determine main table
+                const mainTable = this.selectedColumns[0]?.table || 'unknown';
+                sql += `\nFROM \`${mainTable}\``;
+                
+                // Add JOINs
+                this.joins.forEach(join => {
+                    sql += `\n${join.type} JOIN \`${join.table}\``;
+                    if (join.condition) {
+                        sql += ` ON ${join.condition}`;
+                    }
+                });
+                
+                // Add WHERE clause
+                const whereClause = this._buildWhereClause();
+                if (whereClause) {
+                    sql += `\nWHERE ${whereClause}`;
+                }
+                
+                // Add GROUP BY
+                if (this.groupByColumns.length > 0) {
+                    const groupParts = this.groupByColumns.map(col => 
+                        col.table ? `\`${col.table}\`.\`${col.column}\`` : `\`${col.column}\``
+                    );
+                    sql += `\nGROUP BY ${groupParts.join(', ')}`;
+                }
+                
+                // Add ORDER BY
+                if (this.orderBy.length > 0) {
+                    const orderParts = this.orderBy.map(o => 
+                        `\`${o.column}\` ${o.direction}`
+                    );
+                    sql += `\nORDER BY ${orderParts.join(', ')}`;
+                }
+                
+                // Add LIMIT
+                if (this.limit) {
+                    sql += `\nLIMIT ${this.limit}`;
+                }
+                
+                return sql;
+            }
+
+            _buildWhereClause() {
+                if (this.filters.length === 0) return '';
+                
+                const conditions = this.filters.filter(f => f.column).map(f => {
+                    let condition = f.table ? `\`${f.table}\`.\`${f.column}\`` : `\`${f.column}\``;
+                    
+                    if (f.operator === 'IS NULL' || f.operator === 'IS NOT NULL') {
+                        return `${condition} ${f.operator}`;
+                    }
+                    
+                    if (f.operator === 'IN' || f.operator === 'NOT IN') {
+                        const values = f.value.split(',').map(v => `'${v.trim()}'`).join(', ');
+                        return `${condition} ${f.operator} (${values})`;
+                    }
+                    
+                    if (f.operator === 'BETWEEN') {
+                        const values = f.value.split(',').map(v => v.trim());
+                        return `${condition} BETWEEN '${values[0]}' AND '${values[1] || ''}'`;
+                    }
+                    
+                    if (f.operator === 'LIKE' || f.operator === 'NOT LIKE') {
+                        return `${condition} ${f.operator} '%${f.value}%'`;
+                    }
+                    
+                    // Check if value is numeric
+                    const isNumeric = /^-?\d+\.?\d*$/.test(f.value);
+                    if (isNumeric) {
+                        return `${condition} ${f.operator} ${f.value}`;
+                    }
+                    
+                    return `${condition} ${f.operator} '${f.value}'`;
+                });
+                
+                return conditions.join(' AND ') || '';
+            }
+
+            format(sql) {
+                // Simple SQL formatter
+                const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER BY', 'GROUP BY', 'LIMIT', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON'];
+                let formatted = sql;
+                
+                keywords.forEach(keyword => {
+                    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+                    formatted = formatted.replace(regex, '\n' + keyword);
+                });
+                
+                return formatted.trim();
+            }
+        }
+
+        // ============================================
+        // Result Grid Manager
+        // ============================================
+        class ResultGridManager {
+            constructor() {
+                this.data = { columns: [], rows: [] };
+                this.currentPage = 0;
+                this.pageSize = 50;
+            }
+
+            setData(data) {
+                this.data = data;
+                this.currentPage = 0;
+                this.render();
+            }
+
+            render() {
+                const header = document.getElementById('resultsHeader');
+                const body = document.getElementById('resultsBody');
+                const info = document.getElementById('resultsInfo');
+                const pageInfo = document.getElementById('pageInfo');
+                
+                header.innerHTML = '';
+                body.innerHTML = '';
+                
+                if (!this.data.columns || this.data.columns.length === 0) {
+                    info.textContent = 'No results';
+                    pageInfo.textContent = 'Page 0 of 0';
+                    this._updatePagination();
+                    return;
+                }
+                
+                // Render header
+                this.data.columns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.textContent = col;
+                    th.dataset.column = col;
+                    th.addEventListener('click', () => this._handleColumnSort(col));
+                    header.appendChild(th);
+                });
+                
+                // Calculate pagination
+                const totalPages = Math.ceil(this.data.rows.length / this.pageSize);
+                const start = this.currentPage * this.pageSize;
+                const end = Math.min(start + this.pageSize, this.data.rows.length);
+                const pageRows = this.data.rows.slice(start, end);
+                
+                // Render rows
+                pageRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    row.forEach((cell, idx) => {
+                        const td = document.createElement('td');
+                        td.textContent = cell !== null ? cell : 'NULL';
+                        td.dataset.row = this.currentPage * this.pageSize + idx;
+                        td.dataset.col = idx;
+                        td.addEventListener('dblclick', () => this._copyCell(cell));
+                        tr.appendChild(td);
+                    });
+                    body.appendChild(tr);
+                });
+                
+                // Update info
+                info.textContent = `${this.data.rows.length} rows returned`;
+                pageInfo.textContent = `Page ${this.currentPage + 1} of ${totalPages || 1}`;
+                
+                this._updatePagination(totalPages);
+            }
+
+            _updatePagination(totalPages) {
+                document.getElementById('btnFirstPage').disabled = this.currentPage === 0;
+                document.getElementById('btnPrevPage').disabled = this.currentPage === 0;
+                document.getElementById('btnNextPage').disabled = this.currentPage >= totalPages - 1;
+                document.getElementById('btnLastPage').disabled = this.currentPage >= totalPages - 1;
+            }
+
+            _handleColumnSort(column) {
+                // Simple sort implementation
+                const colIndex = this.data.columns.indexOf(column);
+                this.data.rows.sort((a, b) => {
+                    const aVal = a[colIndex];
+                    const bVal = b[colIndex];
+                    if (aVal === bVal) return 0;
+                    return aVal < bVal ? -1 : 1;
+                });
+                this.render();
+            }
+
+            _copyCell(content) {
+                navigator.clipboard.writeText(String(content)).then(() => {
+                    app.toast.show('Cell copied to clipboard', 'success', 1500);
+                });
+            }
+
+            goToPage(page) {
+                const totalPages = Math.ceil(this.data.rows.length / this.pageSize);
+                if (page >= 0 && page < totalPages) {
+                    this.currentPage = page;
+                    this.render();
+                }
+            }
+
+            copyToClipboard() {
+                if (!this.data.rows.length) return;
+                
+                const csv = [
+                    this.data.columns.join('\t'),
+                    ...this.data.rows.map(row => row.map(cell => String(cell)).join('\t'))
+                ].join('\n');
+                
+                navigator.clipboard.writeText(csv).then(() => {
+                    app.toast.show('Results copied to clipboard', 'success');
+                });
+            }
+
+            exportToCSV() {
+                if (!this.data.rows.length) {
+                    app.toast.show('No results to export', 'warning');
+                    return;
+                }
+                
+                const csv = [
+                    this.data.columns.join(','),
+                    ...this.data.rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                ].join('\n');
+                
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `query_results_${Date.now()}.csv`;
+                link.click();
+                URL.revokeObjectURL(url);
+                
+                app.toast.show('Results exported to CSV', 'success');
+            }
+        }
+
+        // ============================================
+        // Main Application Class
+        // ============================================
+        class DatabaseApp {
+            constructor() {
+                this.provider = new MockDatabaseProvider();
+                this.theme = new ThemeManager();
+                this.sqlGenerator = new SQLGenerator();
+                this.resultGrid = new ResultGridManager();
+                this.toast = new ToastManager('toastContainer');
+                
+                this.state = {
+                    connected: false,
+                    currentSchema: null,
+                    currentTable: null,
+                    selectedColumns: [],
+                    filters: [],
+                    groupByColumns: [],
+                    joins: [],
+                    expandedNodes: new Set()
+                };
+                
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadSettings();
+                this.updateUIState();
+                this.initResizable();
+            }
+
+            bindEvents() {
+                // Toolbar buttons
+                document.getElementById('btnConnect').addEventListener('click', () => this.connect());
+                document.getElementById('btnDisconnect').addEventListener('click', () => this.disconnect());
+                document.getElementById('btnTestConnection').addEventListener('click', () => this.testConnection());
+                document.getElementById('btnRefresh').addEventListener('click', () => this.refreshMetadata());
+                document.getElementById('btnExecute').addEventListener('click', () => this.executeQuery());
+                document.getElementById('btnClear').addEventListener('click', () => this.clearAll());
+                document.getElementById('btnSaveQuery').addEventListener('click', () => this.saveQuery());
+                document.getElementById('btnLoadQuery').addEventListener('click', () => this.showSavedQueries());
+                document.getElementById('btnExport').addEventListener('click', () => this.exportQuery());
+                document.getElementById('btnSettings').addEventListener('click', () => this.showSettings());
+                document.getElementById('btnDarkMode').addEventListener('click', () => this.toggleDarkMode());
+                
+                // Connection panel buttons
+                document.getElementById('btnExpandAll').addEventListener('click', () => this.expandAll());
+                
+                // SQL actions
+                document.getElementById('btnCopySql').addEventListener('click', () => this.copySQL());
+                document.getElementById('btnFormatSql').addEventListener('click', () => this.formatSQL());
+                
+                // Results actions
+                document.getElementById('btnCopyResults').addEventListener('click', () => this.resultGrid.copyToClipboard());
+                document.getElementById('btnExportResults').addEventListener('click', () => this.resultGrid.exportToCSV());
+                
+                // Pagination
+                document.getElementById('btnFirstPage').addEventListener('click', () => this.resultGrid.goToPage(0));
+                document.getElementById('btnPrevPage').addEventListener('click', () => this.resultGrid.goToPage(this.resultGrid.currentPage - 1));
+                document.getElementById('btnNextPage').addEventListener('click', () => this.resultGrid.goToPage(this.resultGrid.currentPage + 1));
+                document.getElementById('btnLastPage').addEventListener('click', () => {
+                    const totalPages = Math.ceil(this.resultGrid.data.rows.length / this.resultGrid.pageSize);
+                    this.resultGrid.goToPage(totalPages - 1);
+                });
+                
+                // Filter builder
+                document.getElementById('addFilterBtn').addEventListener('click', () => this.addFilter());
+                
+                // Settings modal
+                document.getElementById('closeSettings').addEventListener('click', () => this.hideSettings());
+                document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
+                document.getElementById('resetLayout').addEventListener('click', () => this.resetLayout());
+                
+                // Settings controls
+                document.getElementById('darkModeToggle').addEventListener('change', (e) => {
+                    this.theme.darkMode = e.target.checked;
+                    this.theme.applyTheme();
+                });
+                
+                document.getElementById('compactModeToggle').addEventListener('change', (e) => {
+                    this.theme.compactMode = e.target.checked;
+                    this.theme.applyTheme();
+                });
+                
+                document.getElementById('fontSizeSlider').addEventListener('input', (e) => {
+                    document.getElementById('fontSizeValue').textContent = e.target.value;
+                    this.theme.setFontSize(parseInt(e.target.value));
+                });
+                
+                // Aggregate buttons
+                document.querySelectorAll('.agg-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.handleAggregateClick(e));
+                });
+                
+                // Search boxes
+                document.getElementById('searchObjects').addEventListener('input', (e) => this.searchObjects(e.target.value));
+                document.getElementById('searchColumns').addEventListener('input', (e) => this.searchColumns(e.target.value));
+            }
+
+            loadSettings() {
+                document.getElementById('darkModeToggle').checked = this.theme.darkMode;
+                document.getElementById('compactModeToggle').checked = this.theme.compactMode;
+                document.getElementById('fontSizeSlider').value = this.theme.fontSize;
+                document.getElementById('fontSizeValue').textContent = this.theme.fontSize;
+            }
+
+            updateUIState() {
+                const connected = this.state.connected;
+                
+                document.getElementById('btnDisconnect').disabled = !connected;
+                document.getElementById('btnTestConnection').disabled = !connected;
+                document.getElementById('btnRefresh').disabled = !connected;
+                document.getElementById('btnExecute').disabled = !connected;
+                document.getElementById('btnSaveQuery').disabled = !connected;
+                document.getElementById('btnLoadQuery').disabled = !connected;
+                document.getElementById('btnExport').disabled = !connected;
+                
+                document.getElementById('statusConnection').textContent = connected ? '🟢 Connected' : '🔴 Disconnected';
+                document.getElementById('statusConnection').style.color = connected ? 'var(--success)' : 'var(--danger)';
+                document.getElementById('statusProvider').textContent = `Provider: ${this.provider.constructor.name.replace('DatabaseProvider', '')}`;
+            }
+
+            async connect() {
+                const dbType = document.getElementById('dbType').value;
+                const server = document.getElementById('server').value;
+                const port = document.getElementById('port').value;
+                const database = document.getElementById('database').value;
+                
+                try {
+                    this.toast.show('Connecting...', 'info');
+                    await this.provider.connect();
+                    
+                    this.state.connected = true;
+                    document.getElementById('statusIndicator').className = 'status-indicator connected';
+                    document.getElementById('statusText').textContent = `Connected to ${database}`;
+                    
+                    this.updateUIState();
+                    this.toast.show('Connected successfully', 'success');
+                    await this.refreshMetadata();
+                } catch (error) {
+                    this.toast.show(`Connection failed: ${error.message}`, 'error');
+                }
+            }
+
+            async disconnect() {
+                try {
+                    await this.provider.disconnect();
+                    this.state.connected = false;
+                    document.getElementById('statusIndicator').className = 'status-indicator disconnected';
+                    document.getElementById('statusText').textContent = 'Disconnected';
+                    
+                    this.updateUIState();
+                    this.toast.show('Disconnected', 'info');
+                } catch (error) {
+                    this.toast.show(`Disconnection failed: ${error.message}`, 'error');
+                }
+            }
+
+            async testConnection() {
+                try {
+                    this.toast.show('Testing connection...', 'info');
+                    const result = await this.provider.test();
+                    if (result) {
+                        this.toast.show('Connection test successful', 'success');
+                    } else {
+                        this.toast.show('Connection test failed', 'error');
+                    }
+                } catch (error) {
+                    this.toast.show(`Test failed: ${error.message}`, 'error');
+                }
+            }
+
+            async refreshMetadata() {
+                try {
+                    const schemas = await this.provider.getSchemas();
+                    this.renderObjectsTree(schemas);
+                    this.toast.show('Metadata refreshed', 'success');
+                } catch (error) {
+                    this.toast.show(`Failed to refresh metadata: ${error.message}`, 'error');
+                }
+            }
+
+            renderObjectsTree(schemas) {
+                const tree = document.getElementById('objectsTree');
+                tree.innerHTML = '';
+                
+                schemas.forEach(schema => {
+                    const schemaItem = this.createTreeItem(schema, '📁', true);
+                    const children = document.createElement('ul');
+                    children.className = 'tree-children';
+                    children.id = `schema-${schema}`;
+                    
+                    // Add tables
+                    this.provider.getTables(schema).then(tables => {
+                        tables.forEach(table => {
+                            const tableItem = this.createTreeItem(table.name, '📄', false);
+                            tableItem.addEventListener('click', () => this.selectTable(table.name, schema));
+                            children.appendChild(tableItem);
+                        });
+                    });
+                    
+                    schemaItem.querySelector('.tree-toggle').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.toggleNode(children, schemaItem);
+                    });
+                    
+                    tree.appendChild(schemaItem);
+                    tree.appendChild(children);
+                });
+            }
+
+            createTreeItem(text, icon, hasChildren) {
+                const item = document.createElement('li');
+                item.className = 'tree-item';
+                item.innerHTML = `
+                    <span class="tree-toggle">${hasChildren ? '▶' : ''}</span>
+                    <span class="tree-item-icon">${icon}</span>
+                    <span class="tree-item-text">${text}</span>
+                `;
+                return item;
+            }
+
+            toggleNode(children, item) {
+                const isExpanded = children.classList.contains('expanded');
+                children.classList.toggle('expanded');
+                item.querySelector('.tree-toggle').textContent = isExpanded ? '▶' : '▼';
+            }
+
+            expandAll() {
+                document.querySelectorAll('.tree-children').forEach(el => el.classList.add('expanded'));
+                document.querySelectorAll('.tree-toggle').forEach(el => el.textContent = '▼');
+            }
+
+            async selectTable(tableName, schema) {
+                this.state.currentTable = tableName;
+                this.state.currentSchema = schema;
+                
+                // Highlight selected table
+                document.querySelectorAll('.tree-item').forEach(item => {
+                    item.classList.remove('selected');
+                    if (item.querySelector('.tree-item-text')?.textContent === tableName) {
+                        item.classList.add('selected');
+                    }
+                });
+                
+                // Load columns
+                try {
+                    const columns = await this.provider.getColumns(tableName, schema);
+                    this.renderColumns(columns);
+                    this.toast.show(`Loaded ${columns.length} columns from ${tableName}`, 'info');
+                } catch (error) {
+                    this.toast.show(`Failed to load columns: ${error.message}`, 'error');
+                }
+            }
+
+            renderColumns(columns) {
+                const container = document.getElementById('columnsList');
+                document.getElementById('columnCount').textContent = columns.length;
+                container.innerHTML = '';
+                
+                // Update Select All checkbox state - check if all columns from current table are selected
+                const selectAllCheckbox = document.getElementById('selectAllColumns');
+                const currentTableCols = this.state.selectedColumns.filter(
+                    c => c.table === this.state.currentTable
+                );
+                const allSelected = columns.length > 0 && currentTableCols.length === columns.length;
+                const someSelected = currentTableCols.length > 0 && currentTableCols.length < columns.length;
+                
+                selectAllCheckbox.checked = allSelected;
+                selectAllCheckbox.indeterminate = someSelected && !allSelected;
+                
+                columns.forEach(col => {
+                    const colDiv = document.createElement('div');
+                    colDiv.className = 'tree-item';
+                    colDiv.innerHTML = `
+                        <span class="tree-item-icon">${col.pk ? '🔑' : col.fk ? '🔗' : '📝'}</span>
+                        <span>
+                            <strong>${col.name}</strong>
+                            <span style="color: var(--text-muted); font-size: 11px;">${col.type}</span>
+                        </span>
+                    `;
+                    colDiv.dataset.column = col.name;
+                    colDiv.dataset.table = this.state.currentTable;
+                    colDiv.addEventListener('dblclick', () => this.addColumn(col.name));
+                    colDiv.addEventListener('click', (e) => {
+                        // Prevent double-triggering when clicking on the column item
+                        e.stopPropagation();
+                        this.addColumn(col.name);
+                    });
+                    container.appendChild(colDiv);
+                });
+                
+                // Bind Select All checkbox
+                selectAllCheckbox.onchange = (e) => {
+                    if (e.target.checked) {
+                        columns.forEach(col => this.addColumn(col.name));
+                    } else {
+                        // Remove all columns from current table only
+                        this.state.selectedColumns = this.state.selectedColumns.filter(
+                            c => c.table !== this.state.currentTable
+                        );
+                        this.renderSelectedColumns();
+                        this.generateSQL();
+                    }
+                    // Update checkbox state after change
+                    e.target.indeterminate = false;
+                };
+            }
+
+            searchColumns(query) {
+                const items = document.querySelectorAll('#columnsList .tree-item');
+                query = query.toLowerCase();
+                
+                items.forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    item.style.display = text.includes(query) ? 'flex' : 'none';
+                });
+            }
+
+            searchObjects(query) {
+                const items = document.querySelectorAll('#objectsTree .tree-item');
+                query = query.toLowerCase();
+                
+                items.forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    item.style.display = text.includes(query) ? 'flex' : 'none';
+                });
+            }
+
+            addColumn(columnName) {
+                const existing = this.state.selectedColumns.find(c => 
+                    c.column === columnName && c.table === this.state.currentTable
+                );
+                
+                if (existing) {
+                    this.toast.show('Column already selected', 'warning');
+                    return;
+                }
+                
+                this.state.selectedColumns.push({
+                    table: this.state.currentTable,
+                    column: columnName,
+                    alias: columnName,
+                    aggregate: null,
+                    sort: null
+                });
+                
+                this.renderSelectedColumns();
+                this.generateSQL();
+                this.toast.show(`Added ${columnName}`, 'success', 1500);
+            }
+
+            renderSelectedColumns() {
+                const container = document.getElementById('selectedColumnsList');
+                document.getElementById('selectedCount').textContent = this.state.selectedColumns.length;
+                container.innerHTML = '';
+                
+                this.state.selectedColumns.forEach((col, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'selected-column-item';
+                    item.innerHTML = `
+                        <span>
+                            ${col.aggregate ? `<strong>${col.aggregate}(</strong>${col.column}<strong>)</strong>` : col.column}
+                            ${col.alias !== col.column ? ` AS ${col.alias}` : ''}
+                        </span>
+                        <div class="actions">
+                            <button onclick="app.setColumnSort(${index})" title="Sort">${col.sort ? (col.sort === 'ASC' ? '↑' : '↓') : '↕'}</button>
+                            <button onclick="app.removeColumn(${index})" title="Remove">✕</button>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            }
+
+            removeColumn(index) {
+                this.state.selectedColumns.splice(index, 1);
+                this.renderSelectedColumns();
+                this.generateSQL();
+            }
+
+            setColumnSort(index) {
+                const col = this.state.selectedColumns[index];
+                if (!col.sort) {
+                    col.sort = 'ASC';
+                } else if (col.sort === 'ASC') {
+                    col.sort = 'DESC';
+                } else {
+                    col.sort = null;
+                }
+                this.renderSelectedColumns();
+                this.generateSQL();
+            }
+
+            handleAggregateClick(e) {
+                const aggType = e.target.dataset.agg;
+                const selectedItems = document.querySelectorAll('.selected-column-item');
+                
+                selectedItems.forEach((item, index) => {
+                    if (item.style.background === 'var(--accent-light)') {
+                        const col = this.state.selectedColumns[index];
+                        if (col.aggregate === aggType) {
+                            col.aggregate = null;
+                            e.target.classList.remove('active');
+                        } else {
+                            col.aggregate = aggType;
+                            document.querySelectorAll('.agg-btn').forEach(b => b.classList.remove('active'));
+                            e.target.classList.add('active');
+                        }
+                    }
+                });
+                
+                this.renderSelectedColumns();
+                this.generateSQL();
+            }
+
+            addFilter() {
+                const table = this.state.currentTable || '';
+                const columns = this.state.currentTable ? 
+                    (this.provider.metadata.columns[this.state.currentTable] || []).map(c => c.name) : [];
+                
+                this.state.filters.push({
+                    table: table,
+                    column: '',
+                    operator: '=',
+                    value: '',
+                    logic: 'AND'
+                });
+                
+                this.renderFilters();
+                this.generateSQL();
+            }
+
+            renderFilters() {
+                const container = document.getElementById('filtersContainer');
+                container.innerHTML = '';
+                
+                this.state.filters.forEach((filter, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'filter-condition';
+                    
+                    const columns = this.state.currentTable ? 
+                        (this.provider.metadata.columns[this.state.currentTable] || []).map(c => c.name) : [];
+                    
+                    div.innerHTML = `
+                        <select data-filter="${index}" data-field="logic" class="form-control" style="min-width: 80px;">
+                            <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option>
+                            <option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option>
+                        </select>
+                        <select data-filter="${index}" data-field="column" class="form-control" style="min-width: 120px;">
+                            <option value="">Select Column</option>
+                            ${columns.map(c => `<option value="${c}" ${filter.column === c ? 'selected' : ''}>${c}</option>`).join('')}
+                        </select>
+                        <select data-filter="${index}" data-field="operator" class="form-control" style="min-width: 100px;">
+                            <option value="=" ${filter.operator === '=' ? 'selected' : ''}>=</option>
+                            <option value="<>" ${filter.operator === '<>' ? 'selected' : ''}><></option>
+                            <option value=">" ${filter.operator === '>' ? 'selected' : ''}>&gt;</option>
+                            <option value="<" ${filter.operator === '<' ? 'selected' : ''}>&lt;</option>
+                            <option value=">=" ${filter.operator === '>=' ? 'selected' : ''}>&gt;=</option>
+                            <option value="<=" ${filter.operator === '<=' ? 'selected' : ''}>&lt;=</option>
+                            <option value="LIKE" ${filter.operator === 'LIKE' ? 'selected' : ''}>LIKE</option>
+                            <option value="NOT LIKE" ${filter.operator === 'NOT LIKE' ? 'selected' : ''}>NOT LIKE</option>
+                            <option value="IN" ${filter.operator === 'IN' ? 'selected' : ''}>IN</option>
+                            <option value="NOT IN" ${filter.operator === 'NOT IN' ? 'selected' : ''}>NOT IN</option>
+                            <option value="BETWEEN" ${filter.operator === 'BETWEEN' ? 'selected' : ''}>BETWEEN</option>
+                            <option value="IS NULL" ${filter.operator === 'IS NULL' ? 'selected' : ''}>IS NULL</option>
+                            <option value="IS NOT NULL" ${filter.operator === 'IS NOT NULL' ? 'selected' : ''}>IS NOT NULL</option>
+                        </select>
+                        <input type="text" data-filter="${index}" data-field="value" class="form-control" 
+                               value="${filter.value}" placeholder="Value" 
+                               ${filter.operator === 'IS NULL' || filter.operator === 'IS NOT NULL' ? 'disabled' : ''}>
+                        <button class="btn-remove" onclick="app.removeFilter(${index})">✕</button>
+                    `;
+                    
+                    // Add event listeners
+                    div.querySelectorAll('[data-filter]').forEach(el => {
+                        el.addEventListener('change', (e) => {
+                            const idx = parseInt(e.target.dataset.filter);
+                            const field = e.target.dataset.field;
+                            this.state.filters[idx][field] = e.target.value;
+                            
+                            // Disable value input for IS NULL / IS NOT NULL
+                            if (field === 'operator') {
+                                const valueInput = div.querySelector('[data-field="value"]');
+                                valueInput.disabled = (e.target.value === 'IS NULL' || e.target.value === 'IS NOT NULL');
+                            }
+                            
+                            this.generateSQL();
+                        });
+                        
+                        el.addEventListener('input', (e) => {
+                            const idx = parseInt(e.target.dataset.filter);
+                            const field = e.target.dataset.field;
+                            this.state.filters[idx][field] = e.target.value;
+                            this.generateSQL();
+                        });
+                    });
+                    
+                    container.appendChild(div);
+                });
+            }
+
+            removeFilter(index) {
+                this.state.filters.splice(index, 1);
+                this.renderFilters();
+                this.generateSQL();
+            }
+
+            generateSQL() {
+                this.sqlGenerator.setSelectedColumns(this.state.selectedColumns);
+                this.sqlGenerator.setFilters(this.state.filters);
+                this.sqlGenerator.setGroupBy(this.state.groupByColumns);
+                this.sqlGenerator.setJoins(this.state.joins);
+                
+                const sql = this.sqlGenerator.generate();
+                document.getElementById('sqlEditor').value = sql;
+            }
+
+            copySQL() {
+                const sql = document.getElementById('sqlEditor').value;
+                navigator.clipboard.writeText(sql).then(() => {
+                    this.toast.show('SQL copied to clipboard', 'success', 1500);
+                });
+            }
+
+            formatSQL() {
+                const sql = document.getElementById('sqlEditor').value;
+                const formatted = this.sqlGenerator.format(sql);
+                document.getElementById('sqlEditor').value = formatted;
+                this.toast.show('SQL formatted', 'success', 1500);
+            }
+
+            async executeQuery() {
+                const sql = document.getElementById('sqlEditor').value;
+                
+                if (!sql || sql.startsWith('--')) {
+                    this.toast.show('No valid SQL to execute', 'warning');
+                    return;
+                }
+                
+                try {
+                    this.toast.show('Executing query...', 'info');
+                    const startTime = performance.now();
+                    
+                    const result = await this.provider.executeQuery(sql);
+                    
+                    const executionTime = Math.round(performance.now() - startTime);
+                    
+                    this.resultGrid.setData(result);
+                    
+                    document.getElementById('statusRows').textContent = `Rows: ${result.rows.length}`;
+                    document.getElementById('statusTime').textContent = `Time: ${executionTime}ms`;
+                    
+                    this.toast.show(`Query executed in ${executionTime}ms`, 'success');
+                } catch (error) {
+                    this.toast.show(`Query failed: ${error.message}`, 'error');
+                }
+            }
+
+            clearAll() {
+                this.state.selectedColumns = [];
+                this.state.filters = [];
+                this.state.groupByColumns = [];
+                
+                this.renderSelectedColumns();
+                this.renderFilters();
+                document.getElementById('resultsHeader').innerHTML = '';
+                document.getElementById('resultsBody').innerHTML = '';
+                document.getElementById('resultsInfo').textContent = 'No results';
+                document.getElementById('sqlEditor').value = '';
+                
+                this.toast.show('Cleared', 'info');
+            }
+
+            saveQuery() {
+                const name = prompt('Enter query name:');
+                if (!name) return;
+                
+                const query = {
+                    name: name,
+                    sql: document.getElementById('sqlEditor').value,
+                    selectedColumns: [...this.state.selectedColumns],
+                    filters: [...this.state.filters],
+                    savedAt: new Date().toISOString()
+                };
+                
+                const queries = StorageManager.load('savedQueries', []);
+                queries.push(query);
+                StorageManager.save('savedQueries', queries);
+                
+                this.toast.show(`Query "${name}" saved`, 'success');
+                this.renderSavedQueriesList();
+            }
+
+            showSavedQueries() {
+                this.showSettings();
+            }
+
+            renderSavedQueriesList() {
+                const list = document.getElementById('savedQueriesList');
+                const queries = StorageManager.load('savedQueries', []);
+                
+                if (queries.length === 0) {
+                    list.innerHTML = '<li style="padding: 14px; color: var(--text-muted);">No saved queries</li>';
+                    return;
+                }
+                
+                list.innerHTML = '';
+                queries.forEach((query, index) => {
+                    const item = document.createElement('li');
+                    item.className = 'query-item';
+                    item.innerHTML = `
+                        <div>
+                            <div class="query-item-name">${query.name}</div>
+                            <div class="query-item-date">${new Date(query.savedAt).toLocaleString()}</div>
+                        </div>
+                        <div class="query-item-actions">
+                            <button onclick="app.loadQuery(${index})" title="Load">📂</button>
+                            <button onclick="app.deleteQuery(${index})" title="Delete">🗑️</button>
+                        </div>
+                    `;
+                    list.appendChild(item);
+                });
+            }
+
+            loadQuery(index) {
+                const queries = StorageManager.load('savedQueries', []);
+                const query = queries[index];
+                
+                if (query) {
+                    document.getElementById('sqlEditor').value = query.sql;
+                    this.state.selectedColumns = query.selectedColumns || [];
+                    this.state.filters = query.filters || [];
+                    
+                    this.renderSelectedColumns();
+                    this.renderFilters();
+                    
+                    this.toast.show(`Loaded "${query.name}"`, 'success');
+                    this.hideSettings();
+                }
+            }
+
+            deleteQuery(index) {
+                const queries = StorageManager.load('savedQueries', []);
+                const query = queries[index];
+                
+                if (confirm(`Delete "${query.name}"?`)) {
+                    queries.splice(index, 1);
+                    StorageManager.save('savedQueries', queries);
+                    this.renderSavedQueriesList();
+                    this.toast.show('Query deleted', 'info');
+                }
+            }
+
+            exportQuery() {
+                const sql = document.getElementById('sqlEditor').value;
+                const blob = new Blob([sql], { type: 'text/sql' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `query_${Date.now()}.sql`;
+                link.click();
+                URL.revokeObjectURL(url);
+                
+                this.toast.show('Query exported', 'success');
+            }
+
+            showSettings() {
+                document.getElementById('settingsModal').classList.add('active');
+                this.renderSavedQueriesList();
+            }
+
+            hideSettings() {
+                document.getElementById('settingsModal').classList.remove('active');
+            }
+
+            saveSettings() {
+                this.theme.darkMode = document.getElementById('darkModeToggle').checked;
+                this.theme.compactMode = document.getElementById('compactModeToggle').checked;
+                this.theme.setFontSize(parseInt(document.getElementById('fontSizeSlider').value));
+                
+                StorageManager.save('darkMode', this.theme.darkMode);
+                StorageManager.save('compactMode', this.theme.compactMode);
+                StorageManager.save('fontSize', this.theme.fontSize);
+                
+                this.hideSettings();
+                this.toast.show('Settings saved', 'success');
+            }
+
+            resetLayout() {
+                if (confirm('Reset all settings to default?')) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            }
+
+            toggleDarkMode() {
+                const isDark = this.theme.toggleDarkMode();
+                document.getElementById('darkModeToggle').checked = isDark;
+                this.toast.show(isDark ? 'Dark mode enabled' : 'Light mode enabled', 'info');
+            }
+
+            // Initialize resizable panels
+            initResizable() {
+                // Database Explorer panel resize
+                const dbPanel = document.getElementById('dbExplorerPanel');
+                const resizeHandleDB = document.getElementById('resizeHandleDB');
+                
+                if (dbPanel && resizeHandleDB) {
+                    let isResizing = false;
+                    
+                    resizeHandleDB.addEventListener('mousedown', (e) => {
+                        isResizing = true;
+                        resizeHandleDB.classList.add('resizing');
+                        document.body.style.cursor = 'col-resize';
+                        e.preventDefault();
+                    });
+                    
+                    document.addEventListener('mousemove', (e) => {
+                        if (!isResizing) return;
+                        
+                        const newWidth = e.clientX - dbPanel.getBoundingClientRect().left;
+                        if (newWidth >= 150 && newWidth <= 600) {
+                            dbPanel.style.width = newWidth + 'px';
+                        }
+                    });
+                    
+                    document.addEventListener('mouseup', () => {
+                        if (isResizing) {
+                            isResizing = false;
+                            resizeHandleDB.classList.remove('resizing');
+                            document.body.style.cursor = '';
+                        }
+                    });
+                }
+                
+                // Columns/Selected columns panel resize
+                const columnsPanel = document.getElementById('columnsExplorerPanel');
+                const selectedPanel = document.getElementById('selectedColumnsPanel');
+                const resizeHandleColumns = document.getElementById('resizeHandleColumns');
+                
+                if (columnsPanel && selectedPanel && resizeHandleColumns) {
+                    let isResizing = false;
+                    
+                    resizeHandleColumns.addEventListener('mousedown', (e) => {
+                        isResizing = true;
+                        resizeHandleColumns.classList.add('resizing');
+                        document.body.style.cursor = 'col-resize';
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
+                    
+                    document.addEventListener('mousemove', (e) => {
+                        if (!isResizing) return;
+                        
+                        const parentRect = columnsPanel.parentElement.getBoundingClientRect();
+                        let newWidth = e.clientX - parentRect.left;
+                        
+                        // Constrain width between 150px and parent width minus 150px
+                        const minWidth = 150;
+                        const maxWidth = parentRect.width - 150;
+                        
+                        if (newWidth < minWidth) newWidth = minWidth;
+                        if (newWidth > maxWidth) newWidth = maxWidth;
+                        
+                        columnsPanel.style.flex = `0 0 ${newWidth}px`;
+                        selectedPanel.style.flex = '1';
+                    });
+                    
+                    document.addEventListener('mouseup', () => {
+                        if (isResizing) {
+                            isResizing = false;
+                            resizeHandleColumns.classList.remove('resizing');
+                            document.body.style.cursor = '';
+                        }
+                    });
+                }
+            }
+        }
+
+        // Initialize application
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new DatabaseApp();
+        });
+    </script>
+</body>
+</html>
