@@ -185,6 +185,39 @@
             grid-template-columns: 280px 1fr;
             grid-template-rows: 1fr 200px;
             overflow: hidden;
+            position: relative;
+        }
+
+        .resizable-container {
+            position: relative;
+            display: flex;
+            height: 100%;
+        }
+
+        .resize-handle-vertical {
+            width: 6px;
+            cursor: col-resize;
+            background: var(--border-color);
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .resize-handle-vertical:hover,
+        .resize-handle-vertical.resizing {
+            background: var(--accent-primary);
+        }
+
+        .resize-handle-horizontal {
+            height: 6px;
+            cursor: row-resize;
+            background: var(--border-color);
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .resize-handle-horizontal:hover,
+        .resize-handle-horizontal.resizing {
+            background: var(--accent-primary);
         }
 
         .panel {
@@ -193,6 +226,8 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            min-width: 150px;
+            min-height: 100px;
         }
 
         .panel-header {
@@ -216,34 +251,46 @@
         .db-explorer-panel {
             grid-row: 1 / 2;
             grid-column: 1 / 2;
-            border-right: 1px solid var(--border-color);
+            border-right: none;
+            position: relative;
         }
 
         /* Column Panels Grid */
         .column-panel {
             grid-row: 1 / 2;
             grid-column: 2 / 3;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .column-panels-row {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
         }
 
         .columns-explorer {
-            grid-column: 1 / 2;
-            grid-row: 1 / 2;
-            border-right: 1px solid var(--border-color);
-            border-bottom: 1px solid var(--border-color);
+            flex: 1;
+            border-right: none;
+            border-bottom: none;
+            position: relative;
+            min-width: 150px;
         }
 
         .selected-columns {
-            grid-column: 2 / 3;
-            grid-row: 1 / 2;
-            border-bottom: 1px solid var(--border-color);
+            flex: 1;
+            border-bottom: none;
+            position: relative;
+            min-width: 150px;
         }
 
         .filter-builder {
-            grid-column: 1 / 3;
-            grid-row: 2 / 3;
+            flex: 0 0 auto;
+            height: 200px;
+            border-top: 1px solid var(--border-color);
+            position: relative;
         }
 
         /* Tree View */
@@ -1061,7 +1108,7 @@
     <!-- Main Content -->
     <div class="main-content">
         <!-- Database Explorer Panel -->
-        <div class="panel db-explorer-panel">
+        <div class="panel db-explorer-panel" id="dbExplorerPanel">
             <div class="panel-header">
                 <span>📁 Database Objects</span>
                 <button class="btn" id="btnExpandAll" style="padding: 4px 8px; font-size: 11px;">Expand All</button>
@@ -1072,40 +1119,49 @@
                 </div>
                 <ul class="tree-view" id="objectsTree"></ul>
             </div>
+            <div class="resize-handle-vertical" id="resizeHandleDB"></div>
         </div>
 
         <!-- Column Panels -->
         <div class="panel column-panel">
-            <!-- Columns Explorer -->
-            <div class="panel columns-explorer">
-                <div class="panel-header">
-                    <span>📋 Columns</span>
-                    <span class="badge" id="columnCount">0</span>
-                </div>
-                <div class="panel-body">
-                    <div class="search-box">
-                        <input type="text" id="searchColumns" placeholder="Search columns...">
+            <div class="column-panels-row">
+                <!-- Columns Explorer -->
+                <div class="panel columns-explorer" id="columnsExplorerPanel">
+                    <div class="panel-header">
+                        <span>📋 Columns</span>
+                        <span class="badge" id="columnCount">0</span>
                     </div>
-                    <div id="columnsList"></div>
+                    <div class="panel-body">
+                        <div class="search-box">
+                            <input type="text" id="searchColumns" placeholder="Search columns...">
+                        </div>
+                        <div class="panel-header" style="background:none; padding:4px 0; border:none;">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                                <input type="checkbox" id="selectAllColumns"> Select All
+                            </label>
+                        </div>
+                        <div id="columnsList"></div>
+                    </div>
+                    <div class="resize-handle-vertical" id="resizeHandleColumns"></div>
                 </div>
-            </div>
 
-            <!-- Selected Columns -->
-            <div class="panel selected-columns">
-                <div class="panel-header">
-                    <span>✅ Selected Columns</span>
-                    <span class="badge" id="selectedCount">0</span>
-                </div>
-                <div class="panel-body">
-                    <div class="aggregate-buttons">
-                        <button class="agg-btn" data-agg="COUNT">COUNT</button>
-                        <button class="agg-btn" data-agg="SUM">SUM</button>
-                        <button class="agg-btn" data-agg="AVG">AVG</button>
-                        <button class="agg-btn" data-agg="MIN">MIN</button>
-                        <button class="agg-btn" data-agg="MAX">MAX</button>
-                        <button class="agg-btn" data-agg="DISTINCT">DISTINCT</button>
+                <!-- Selected Columns -->
+                <div class="panel selected-columns" id="selectedColumnsPanel">
+                    <div class="panel-header">
+                        <span>✅ Selected Columns</span>
+                        <span class="badge" id="selectedCount">0</span>
                     </div>
-                    <div id="selectedColumnsList"></div>
+                    <div class="panel-body">
+                        <div class="aggregate-buttons">
+                            <button class="agg-btn" data-agg="COUNT">COUNT</button>
+                            <button class="agg-btn" data-agg="SUM">SUM</button>
+                            <button class="agg-btn" data-agg="AVG">AVG</button>
+                            <button class="agg-btn" data-agg="MIN">MIN</button>
+                            <button class="agg-btn" data-agg="MAX">MAX</button>
+                            <button class="agg-btn" data-agg="DISTINCT">DISTINCT</button>
+                        </div>
+                        <div id="selectedColumnsList"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1896,6 +1952,7 @@
                 this.bindEvents();
                 this.loadSettings();
                 this.updateUIState();
+                this.initResizable();
             }
 
             bindEvents() {
@@ -2127,6 +2184,11 @@
                 document.getElementById('columnCount').textContent = columns.length;
                 container.innerHTML = '';
                 
+                // Update Select All checkbox state
+                const selectAllCheckbox = document.getElementById('selectAllColumns');
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                
                 columns.forEach(col => {
                     const colDiv = document.createElement('div');
                     colDiv.className = 'tree-item';
@@ -2143,6 +2205,21 @@
                     colDiv.addEventListener('click', () => this.addColumn(col.name));
                     container.appendChild(colDiv);
                 });
+                
+                // Bind Select All checkbox
+                selectAllCheckbox.onchange = (e) => {
+                    if (e.target.checked) {
+                        columns.forEach(col => this.addColumn(col.name));
+                    } else {
+                        // Remove all columns from current table
+                        this.state.selectedColumns = this.state.selectedColumns.filter(
+                            c => c.table !== this.state.currentTable
+                        );
+                        this.renderSelectedColumns();
+                        this.generateSQL();
+                    }
+                    e.target.indeterminate = false;
+                };
             }
 
             searchColumns(query) {
@@ -2535,6 +2612,78 @@
                 const isDark = this.theme.toggleDarkMode();
                 document.getElementById('darkModeToggle').checked = isDark;
                 this.toast.show(isDark ? 'Dark mode enabled' : 'Light mode enabled', 'info');
+            }
+
+            // Initialize resizable panels
+            initResizable() {
+                // Database Explorer panel resize
+                const dbPanel = document.getElementById('dbExplorerPanel');
+                const resizeHandleDB = document.getElementById('resizeHandleDB');
+                
+                if (dbPanel && resizeHandleDB) {
+                    let isResizing = false;
+                    
+                    resizeHandleDB.addEventListener('mousedown', (e) => {
+                        isResizing = true;
+                        resizeHandleDB.classList.add('resizing');
+                        document.body.style.cursor = 'col-resize';
+                        e.preventDefault();
+                    });
+                    
+                    document.addEventListener('mousemove', (e) => {
+                        if (!isResizing) return;
+                        
+                        const newWidth = e.clientX - dbPanel.getBoundingClientRect().left;
+                        if (newWidth >= 150 && newWidth <= 600) {
+                            dbPanel.style.width = newWidth + 'px';
+                        }
+                    });
+                    
+                    document.addEventListener('mouseup', () => {
+                        if (isResizing) {
+                            isResizing = false;
+                            resizeHandleDB.classList.remove('resizing');
+                            document.body.style.cursor = '';
+                        }
+                    });
+                }
+                
+                // Columns/Selected columns panel resize
+                const columnsPanel = document.getElementById('columnsExplorerPanel');
+                const resizeHandleColumns = document.getElementById('resizeHandleColumns');
+                
+                if (columnsPanel && resizeHandleColumns) {
+                    let isResizing = false;
+                    
+                    resizeHandleColumns.addEventListener('mousedown', (e) => {
+                        isResizing = true;
+                        resizeHandleColumns.classList.add('resizing');
+                        document.body.style.cursor = 'col-resize';
+                        e.preventDefault();
+                    });
+                    
+                    document.addEventListener('mousemove', (e) => {
+                        if (!isResizing) return;
+                        
+                        const parentRect = columnsPanel.parentElement.getBoundingClientRect();
+                        const newWidth = e.clientX - parentRect.left;
+                        const maxPercent = 80;
+                        const minPercent = 20;
+                        
+                        if (newWidth >= parentRect.width * (minPercent / 100) && 
+                            newWidth <= parentRect.width * (maxPercent / 100)) {
+                            columnsPanel.style.flex = `0 0 ${newWidth}px`;
+                        }
+                    });
+                    
+                    document.addEventListener('mouseup', () => {
+                        if (isResizing) {
+                            isResizing = false;
+                            resizeHandleColumns.classList.remove('resizing');
+                            document.body.style.cursor = '';
+                        }
+                    });
+                }
             }
         }
 
