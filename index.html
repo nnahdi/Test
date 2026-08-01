@@ -1142,8 +1142,10 @@
                         </div>
                         <div id="columnsList"></div>
                     </div>
-                    <div class="resize-handle-vertical" id="resizeHandleColumns"></div>
                 </div>
+                
+                <!-- Resize Handle -->
+                <div class="resize-handle-vertical" id="resizeHandleColumns"></div>
 
                 <!-- Selected Columns -->
                 <div class="panel selected-columns" id="selectedColumnsPanel">
@@ -2184,10 +2186,16 @@
                 document.getElementById('columnCount').textContent = columns.length;
                 container.innerHTML = '';
                 
-                // Update Select All checkbox state
+                // Update Select All checkbox state - check if all columns from current table are selected
                 const selectAllCheckbox = document.getElementById('selectAllColumns');
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
+                const currentTableCols = this.state.selectedColumns.filter(
+                    c => c.table === this.state.currentTable
+                );
+                const allSelected = columns.length > 0 && currentTableCols.length === columns.length;
+                const someSelected = currentTableCols.length > 0 && currentTableCols.length < columns.length;
+                
+                selectAllCheckbox.checked = allSelected;
+                selectAllCheckbox.indeterminate = someSelected && !allSelected;
                 
                 columns.forEach(col => {
                     const colDiv = document.createElement('div');
@@ -2202,7 +2210,11 @@
                     colDiv.dataset.column = col.name;
                     colDiv.dataset.table = this.state.currentTable;
                     colDiv.addEventListener('dblclick', () => this.addColumn(col.name));
-                    colDiv.addEventListener('click', () => this.addColumn(col.name));
+                    colDiv.addEventListener('click', (e) => {
+                        // Prevent double-triggering when clicking on the column item
+                        e.stopPropagation();
+                        this.addColumn(col.name);
+                    });
                     container.appendChild(colDiv);
                 });
                 
@@ -2211,13 +2223,14 @@
                     if (e.target.checked) {
                         columns.forEach(col => this.addColumn(col.name));
                     } else {
-                        // Remove all columns from current table
+                        // Remove all columns from current table only
                         this.state.selectedColumns = this.state.selectedColumns.filter(
                             c => c.table !== this.state.currentTable
                         );
                         this.renderSelectedColumns();
                         this.generateSQL();
                     }
+                    // Update checkbox state after change
                     e.target.indeterminate = false;
                 };
             }
@@ -2650,9 +2663,10 @@
                 
                 // Columns/Selected columns panel resize
                 const columnsPanel = document.getElementById('columnsExplorerPanel');
+                const selectedPanel = document.getElementById('selectedColumnsPanel');
                 const resizeHandleColumns = document.getElementById('resizeHandleColumns');
                 
-                if (columnsPanel && resizeHandleColumns) {
+                if (columnsPanel && selectedPanel && resizeHandleColumns) {
                     let isResizing = false;
                     
                     resizeHandleColumns.addEventListener('mousedown', (e) => {
@@ -2660,20 +2674,24 @@
                         resizeHandleColumns.classList.add('resizing');
                         document.body.style.cursor = 'col-resize';
                         e.preventDefault();
+                        e.stopPropagation();
                     });
                     
                     document.addEventListener('mousemove', (e) => {
                         if (!isResizing) return;
                         
                         const parentRect = columnsPanel.parentElement.getBoundingClientRect();
-                        const newWidth = e.clientX - parentRect.left;
-                        const maxPercent = 80;
-                        const minPercent = 20;
+                        let newWidth = e.clientX - parentRect.left;
                         
-                        if (newWidth >= parentRect.width * (minPercent / 100) && 
-                            newWidth <= parentRect.width * (maxPercent / 100)) {
-                            columnsPanel.style.flex = `0 0 ${newWidth}px`;
-                        }
+                        // Constrain width between 150px and parent width minus 150px
+                        const minWidth = 150;
+                        const maxWidth = parentRect.width - 150;
+                        
+                        if (newWidth < minWidth) newWidth = minWidth;
+                        if (newWidth > maxWidth) newWidth = maxWidth;
+                        
+                        columnsPanel.style.flex = `0 0 ${newWidth}px`;
+                        selectedPanel.style.flex = '1';
                     });
                     
                     document.addEventListener('mouseup', () => {
