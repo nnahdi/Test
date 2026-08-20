@@ -1,0 +1,178 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "معالج ملفات Excel";
+}
+
+<div class="container mt-4" dir="rtl">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-5 fw-bold text-primary">نظام معالجة ملفات Excel</h1>
+            <p class="lead text-muted">رفع ومعالجة ملفات Excel ومطابقتها مع النموذج القياسي</p>
+        </div>
+    </div>
+
+    <!-- نموذج رفع الملف -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-upload"></i> رفع الملفات</h5>
+        </div>
+        <div class="card-body">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="excelFile" class="form-label">ملف Excel للمعالجة *</label>
+                        <input type="file" class="form-control" id="excelFile" name="excelFile" accept=".xlsx,.xls" required>
+                        <div class="form-text">الملف الرئيسي الذي يحتوي على البيانات المراد معالجتها</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="goodSampleFile" class="form-label">ملف النموذج الصحيح</label>
+                        <input type="file" class="form-control" id="goodSampleFile" name="goodSampleFile" accept=".xlsx,.xls">
+                        <div class="form-text">النموذج المرجعي للأعمدة والقيم الافتراضية</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="natsFile" class="form-label">ملف الجنسيات</label>
+                        <input type="file" class="form-control" id="natsFile" name="natsFile" accept=".xlsx,.xls">
+                        <div class="form-text">قائمة الجنسيات والدول للمطابقة</div>
+                    </div>
+                </div>
+                
+                <div class="mt-3 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" onclick="loadDefaultFiles()">
+                        <i class="bi bi-folder"></i> استخدام الملفات الافتراضية
+                    </button>
+                    <span id="fileStatus" class="align-self-center text-success"></span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- إعدادات المعالجة -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-gear"></i> إعدادات المعالجة</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="bookingStart" class="form-label">بداية رقم الحجز</label>
+                    <input type="number" class="form-control" id="bookingStart" value="1" min="1">
+                </div>
+                <div class="col-md-4">
+                    <label for="identityStart" class="form-label">بداية رقم الهوية</label>
+                    <input type="number" class="form-control" id="identityStart" value="1000000000" min="100000000">
+                </div>
+                <div class="col-md-4">
+                    <label for="defaultPhone" class="form-label">رقم الجوال الافتراضي</label>
+                    <input type="text" class="form-control" id="defaultPhone" value="966500000000" pattern="[0-9]{9,13}">
+                </div>
+            </div>
+            
+            <hr class="my-4">
+            
+            <h6 class="fw-bold mb-3">القيم الافتراضية للأعمدة</h6>
+            <div id="defaultValuesContainer" class="row g-3">
+                <div class="col-12 text-muted">سيتم تحميل القيم الافتراضية من ملف النموذج الصحيح بعد رفعه</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- زر المعالجة -->
+    <div class="d-grid gap-2 mb-4">
+        <button type="button" class="btn btn-primary btn-lg" id="processBtn" onclick="processFile()">
+            <i class="bi bi-play-circle"></i> تحليل ومعالجة الملف
+        </button>
+    </div>
+
+    <!-- شاشة التحميل -->
+    <div id="loadingDiv" class="text-center my-4" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">جاري المعالجة...</span>
+        </div>
+        <p class="mt-2">جاري معالجة الملف، يرجى الانتظار...</p>
+    </div>
+
+    <!-- نتائج المعالجة -->
+    <div id="resultsDiv" class="card shadow-sm mb-4" style="display: none;">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-check-circle"></i> ملخص النتائج</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 text-center">
+                <div class="col-md-4 col-lg-2">
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted">عدد الصفوف</h6>
+                        <h3 class="text-primary" id="totalRows">0</h3>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted">عدد الأعمدة</h6>
+                        <h3 class="text-primary" id="totalColumns">0</h3>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted">القيم المصححة</h6>
+                        <h3 class="text-success" id="correctedValues">0</h3>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted">أرقام جوال غير صالحة</h6>
+                        <h3 class="text-warning" id="invalidPhones">0</h3>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted">جنسيات تم مطابقتها</h6>
+                        <h3 class="text-info" id="matchedNats">0</h3>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted">أعمدة إضافية</h6>
+                        <h3 class="text-secondary" id="addedColumns">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 mt-2 text-center">
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded">
+                        <h6 class="text-muted">الأعمدة الإضافية المحفوظة</h6>
+                        <h3 class="text-secondary" id="extraColumns">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- معاينة البيانات -->
+    <div id="previewDiv" class="card shadow-sm mb-4" style="display: none;">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-eye"></i> معاينة البيانات (أول 10 صفوف)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-bordered table-hover table-sm" id="previewTable">
+                    <thead class="table-light sticky-top"></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- زر التحميل -->
+    <div id="downloadDiv" class="d-grid gap-2" style="display: none;">
+        <a href="#" class="btn btn-success btn-lg" id="downloadBtn">
+            <i class="bi bi-download"></i> تحميل الملف المعالج
+        </a>
+    </div>
+
+    <!-- رسائل الخطأ -->
+    <div id="errorDiv" class="alert alert-danger mt-4" style="display: none;"></div>
+</div>
+
+@section Scripts {
+    <script src="~/js/excel-processor.js"></script>
+}
