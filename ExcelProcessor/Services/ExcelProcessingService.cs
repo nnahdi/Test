@@ -214,23 +214,45 @@ public class ExcelProcessingService : IExcelProcessingService
 
             // تحديد الأعمدة النهائية: المطلوبة أولاً، ثم الإضافية
             var finalColumns = new List<string>();
+            var originalColumnsMap = new Dictionary<string, string>(); // Maps required column -> original column name
             var addedColumnsCount = 0;
             
             // إضافة الأعمدة المطلوبة أولاً
             foreach (var reqCol in requiredColumns)
             {
                 finalColumns.Add(reqCol);
-                if (!inputColumns.Contains(reqCol))
+                
+                // البحث عن عمود مطابق في الملف الأصلي (بما في ذلك المرادفات)
+                string? matchingInputCol = null;
+                if (inputColumns.Contains(reqCol))
+                {
+                    matchingInputCol = reqCol;
+                }
+                else
+                {
+                    // بحث عن مرادفات للأعمدة
+                    matchingInputCol = FindMatchingColumn(reqCol, inputColumns);
+                }
+                
+                if (matchingInputCol != null)
+                {
+                    originalColumnsMap[reqCol] = matchingInputCol;
+                }
+                else
                 {
                     addedColumnsCount++;
                 }
             }
 
-            // إضافة الأعمدة الإضافية من الملف الأصلي
+            // إضافة الأعمدة الإضافية من الملف الأصلي (غير المطلوبة)
             var extraColumnsCount = 0;
             foreach (var inputCol in inputColumns)
             {
-                if (!finalColumns.Contains(inputCol))
+                // التحقق مما إذا كان هذا العمود قد تم استخدامه كمرادف لعمود مطلوب
+                bool isUsedAsMapping = originalColumnsMap.Values.Contains(inputCol);
+                bool isRequired = requiredColumns.Contains(inputCol);
+                
+                if (!isRequired && !isUsedAsMapping)
                 {
                     finalColumns.Add(inputCol);
                     extraColumnsCount++;
@@ -272,10 +294,20 @@ public class ExcelProcessingService : IExcelProcessingService
                     string? originalValue = null;
                     bool wasCorrected = false;
 
-                    // إذا كان العمود موجوداً في الملف الأصلي
+                    // البحث عن العمود المصدر (إما نفس الاسم أو عمودMapped)
+                    string? sourceColumn = null;
                     if (originalData.ContainsKey(finalCol))
                     {
-                        value = originalData[finalCol];
+                        sourceColumn = finalCol;
+                    }
+                    else if (originalColumnsMap.TryGetValue(finalCol, out var mappedCol) && originalData.ContainsKey(mappedCol))
+                    {
+                        sourceColumn = mappedCol;
+                    }
+                    
+                    if (sourceColumn != null)
+                    {
+                        value = originalData[sourceColumn];
                         
                         // تطبيق التصحيحات حسب نوع العمود
                         if (finalCol == "الجنسية" || finalCol == "Nat")
@@ -308,7 +340,6 @@ public class ExcelProcessingService : IExcelProcessingService
                             if (string.IsNullOrEmpty(value) || value == "0")
                             {
                                 value = bookingCounter.ToString();
-                                originalValue = value; // لا نعتبر هذا تصحيحاً بل توليد
                                 bookingCounter++;
                             }
                         }
@@ -414,29 +445,57 @@ public class ExcelProcessingService : IExcelProcessingService
             return defaultPhone;
         }
 
-        // تنظيف الرقم من أي أحرف غير رقمية
+        // تنظيف الرقم من أي أحرف غير رقمية ومسافات
         var cleaned = new string(value.Where(char.IsDigit).ToArray());
         
-        // التعامل مع الصيغة الدولية 966XXXXXXXXX
+        if (string.IsNullOrEmpty(cleaned))
+        {
+            wasInvalid = true;
+            return defaultPhone;
+        }
+        
+        // التعامل مع الصيغة الدولية 966XXXXXXXXX (12 رقم)
         if (cleaned.StartsWith("966") && cleaned.Length == 12)
         {
             // استخدام آخر 9 أرقام فقط كما في النموذج
-            return cleaned.Substring(3);
+            var last9 = cleaned.Substring(3);
+            // التحقق من أن الأرقام الـ 9 تبدأ بـ 5 (للسعودية)
+            if (last9.StartsWith("5"))
+            {
+                return last9;
+            }
+            // إذا لم تبدأ بـ 5، نستخدمها كما هي (قد تكون لدولة أخرى)
+            return last9;
         }
         else if (cleaned.StartsWith("966") && cleaned.Length > 12)
         {
             // رقم طويل جداً، استخدام آخر 9 أرقام بعد 966
-            return cleaned.Substring(3, 9);
+            if (cleaned.Length >= 15)
+            {
+                return cleaned.Substring(3, 9);
+            }
+            wasInvalid = true;
+            return defaultPhone;
         }
         else if (cleaned.Length == 9)
         {
-            // رقم محلي صحيح
+            // رقم محلي صحيح (9 أرقام)
             return cleaned;
         }
         else if (cleaned.StartsWith("05") && cleaned.Length == 10)
         {
-            // رقم يبدأ بـ 05، تحويله إلى 9 أرقام
+            // رقم يبدأ بـ 05، تحويله إلى 9 أرقام بحذف الصفر
             return cleaned.Substring(1);
+        }
+        else if (cleaned.StartsWith("5") && cleaned.Length == 9)
+        {
+            // رقم يبدأ بـ 5 وطوله 9 أرقام
+            return cleaned;
+        }
+        else if (cleaned.Length >= 9)
+        {
+            // محاولة استخراج 9 أرقام من النهاية
+            return cleaned.Substring(cleaned.Length - 9);
         }
         else
         {
@@ -560,6 +619,55 @@ public class ExcelProcessingService : IExcelProcessingService
         }
 
         return value;
+    }
+
+    /// <summary>
+    /// البحث عن عمود مطابق في القائمة باستخدام مرادفات معروفة
+    /// </summary>
+    private string? FindMatchingColumn(string requiredColumn, List<string> inputColumns)
+    {
+        // قائمة المرادفات للأعمدة الشائعة
+        var columnSynonyms = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["رقم الحجز"] = new List<string> { "م", "الرقم التسلسلي", "تسلسل", "#", "ترتيب" },
+            ["رقم الهوية"] = new List<string> { "الهوية", "رقم الهوية", "ID", "Identity" },
+            ["رقم الجوال"] = new List<string> { "الهاتف", "جوال", "موبايل", "Phone", "Mobile", "Tel", "Contact" },
+            ["اسم الحاج"] = new List<string> { "الاسم", "اسم", "Name", "المعتمر" },
+            ["الجنس"] = new List<string> { "النوع", "Gender", "Sex" },
+            ["تاريخ الميلاد"] = new List<string> { "الميلاد", "تاريخ", "DOB", "BirthDate", "DateOfBirth", "العمر" },
+            ["الجنسية"] = new List<string> { "Nat", "Nationality", "دولة", "بلد", "القومية" },
+            ["نوع الباقة"] = new List<string> { "الباقة", "Package", "ServiceType", "نوع الخدمة" },
+            ["نوع المواصلات"] = new List<string> { "المواصلات", "Transport", "VehicleType", "النقل" },
+            ["اسم الشركه"] = new List<string> { "الشركة", "Company", "Organization", "جهة", "المؤسسة" },
+            ["المدينة"] = new List<string> { "مدينة", "City", "Location", "مقر التواجد", "العنوان" }
+        };
+
+        // البحث عن مرادف مطابق
+        if (columnSynonyms.TryGetValue(requiredColumn, out var synonyms))
+        {
+            foreach (var synonym in synonyms)
+            {
+                var match = inputColumns.FirstOrDefault(c => 
+                    c.Equals(synonym, StringComparison.OrdinalIgnoreCase) ||
+                    c.Contains(synonym, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+        }
+
+        // بحث جزئي إذا لم يتم العثور على مرادف
+        foreach (var inputCol in inputColumns)
+        {
+            if (requiredColumn.Contains(inputCol, StringComparison.OrdinalIgnoreCase) ||
+                inputCol.Contains(requiredColumn, StringComparison.OrdinalIgnoreCase))
+            {
+                return inputCol;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
